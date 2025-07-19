@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-800;
+  }
+  
+  /* Custom slider styles */
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 6px;
+    @apply bg-slate-200 rounded-full cursor-pointer;
+  }
+
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    @apply bg-brand-600 rounded-full border-4 border-white shadow-md;
+    transition: background-color 0.2s ease-in-out;
+  }
+  
+  input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    @apply bg-brand-600 rounded-full border-4 border-white shadow-md;
+    transition: background-color 0.2s ease-in-out;
+  }
+
+  input[type="range"]:hover::-webkit-slider-thumb {
+    @apply bg-brand-700;
+  }
+  input[type="range"]:hover::-moz-range-thumb {
+    @apply bg-brand-700;
+  }
+}
