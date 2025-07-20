@@ -24,7 +24,7 @@ const InvestmentForm: React.FC<InvestmentFormProps> = ({ state, onStateChange })
         value={state.lumpsum}
         onChange={(v) => onStateChange({ lumpsum: v })}
         min={0}
-        max={1000000}
+        max={10000000}
         step={10000}
         format={formatCurrency}
         icon={<Landmark className="w-5 h-5 text-brand-600" />}
