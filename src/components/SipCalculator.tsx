@@ -1,96 +1,119 @@
-import React, { useState, useMemo } from 'react';
-import { PiggyBank, TrendingUp, Wallet } from 'lucide-react';
+import React, { useState, useMemo, useRef } from 'react';
+import { Thermometer, Download, Loader2 } from 'lucide-react';
 import SliderInput from './SliderInput';
 import ResultChart from './ResultChart';
 import { formatCurrency } from '../lib/utils';
+import { calculateFutureValue } from '../lib/investmentCalculations';
+import InvestmentForm, { InvestmentFormState } from './InvestmentForm';
+import { generatePdfReport } from '../lib/reportGenerator';
 
 const SipCalculator: React.FC = () => {
-  const [monthlyInvestment, setMonthlyInvestment] = useState(10000);
-  const [returnRate, setReturnRate] = useState(12);
-  const [timePeriod, setTimePeriod] = useState(10);
+  const [formState, setFormState] = useState<InvestmentFormState>({
+    lumpsum: 50000,
+    monthlyInvestment: 10000,
+    stepUp: 10,
+    returnRate: 12,
+    timePeriod: 10,
+  });
+  const [inflationRate, setInflationRate] = useState(6);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const reportRef = useRef<HTMLDivElement>(null);
+
+  const handleFormChange = (newState: Partial<InvestmentFormState>) => {
+    setFormState(prevState => ({ ...prevState, ...newState }));
+  };
 
   const { totalInvested, estimatedReturns, totalValue } = useMemo(() => {
-    const i = returnRate / 12 / 100;
-    const n = timePeriod * 12;
-    const M = monthlyInvestment;
+    return calculateFutureValue(formState);
+  }, [formState]);
 
-    if (i === 0) {
-      const totalVal = M * n;
-      return {
-        totalInvested: totalVal,
-        estimatedReturns: 0,
-        totalValue: totalVal,
-      };
+  const inflationAdjustedValue = useMemo(() => {
+    return totalValue / Math.pow(1 + (inflationRate / 100), formState.timePeriod);
+  }, [totalValue, inflationRate, formState.timePeriod]);
+
+  const handleDownloadPdf = async () => {
+    if (reportRef.current && !isGeneratingPdf) {
+      setIsGeneratingPdf(true);
+      try {
+        const date = new Date().toISOString().split('T')[0];
+        await generatePdfReport(reportRef.current, `Investment-Report-${date}.pdf`);
+      } catch (error) {
+        console.error("Failed to generate PDF report.", error);
+        // Here you could show an error message to the user
+      } finally {
+        setIsGeneratingPdf(false);
+      }
     }
-
-    const totalVal = M * ((Math.pow(1 + i, n) - 1) / i) * (1 + i);
-    const invested = M * n;
-    const returns = totalVal - invested;
-
-    return {
-      totalInvested: invested,
-      estimatedReturns: returns,
-      totalValue: totalVal,
-    };
-  }, [monthlyInvestment, returnRate, timePeriod]);
+  };
 
   return (
     <div className="container mx-auto px-4 py-12 md:py-20">
       <div className="bg-white rounded-2xl shadow-xl shadow-slate-200/60 overflow-hidden grid grid-cols-1 lg:grid-cols-5">
         <div className="lg:col-span-2 p-8 lg:p-10 border-r border-slate-100">
-          <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-8">Plan your Investment</h2>
-          <div className="space-y-8">
+          <h2 className="text-2xl md:text-3xl font-bold text-slate-800 mb-8">Investment Growth Calculator</h2>
+          <InvestmentForm state={formState} onStateChange={handleFormChange} />
+          <div className="mt-8">
             <SliderInput
-              label="Monthly Investment"
-              value={monthlyInvestment}
-              onChange={setMonthlyInvestment}
-              min={500}
-              max={100000}
-              step={500}
-              format={formatCurrency}
-            />
-            <SliderInput
-              label="Expected Return Rate (p.a.)"
-              value={returnRate}
-              onChange={setReturnRate}
-              min={1}
-              max={30}
+              label="Assumed Inflation Rate (p.a.)"
+              value={inflationRate}
+              onChange={setInflationRate}
+              min={0}
+              max={15}
               step={0.5}
               format={(v) => `${v}%`}
-            />
-            <SliderInput
-              label="Time Period (Years)"
-              value={timePeriod}
-              onChange={setTimePeriod}
-              min={1}
-              max={40}
-              step={1}
-              format={(v) => `${v} Yr`}
+              icon={<Thermometer className="w-5 h-5 text-brand-600" />}
             />
           </div>
         </div>
         <div className="lg:col-span-3 p-8 lg:p-10 bg-slate-50/50">
           <div className="flex flex-col h-full">
-            <div className="mb-8">
-              <p className="text-slate-500">In {timePeriod} years, you will have</p>
-              <p className="text-4xl md:text-5xl font-extrabold text-brand-800 tracking-tight animate-fade-in-up" style={{animationDelay: '100ms'}}>
-                {formatCurrency(totalValue)}
-              </p>
-            </div>
-            
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-              <div className="bg-white p-4 rounded-lg border border-slate-200 animate-fade-in-up" style={{animationDelay: '200ms'}}>
-                <p className="text-sm text-slate-500">Invested Amount</p>
-                <p className="text-xl font-bold text-slate-700">{formatCurrency(totalInvested)}</p>
+            <div ref={reportRef} className="bg-white p-6 rounded-xl border border-slate-200">
+              <div className="mb-6 text-center">
+                <p className="text-slate-500">In {formState.timePeriod} years, you will have</p>
+                <p className="text-4xl md:text-5xl font-extrabold text-brand-800 tracking-tight">
+                  {formatCurrency(totalValue)}
+                </p>
               </div>
-              <div className="bg-white p-4 rounded-lg border border-slate-200 animate-fade-in-up" style={{animationDelay: '300ms'}}>
-                <p className="text-sm text-slate-500">Estimated Returns</p>
-                <p className="text-xl font-bold text-emerald-600">{formatCurrency(estimatedReturns)}</p>
+              
+              <div className="bg-slate-100 p-4 rounded-lg border border-slate-200 mb-6">
+                <p className="text-slate-500 text-sm">Value in today's money (after {inflationRate}% inflation)</p>
+                <p className="text-2xl font-bold text-slate-700">{formatCurrency(inflationAdjustedValue)}</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                <div className="bg-white p-4 rounded-lg border border-slate-200">
+                  <p className="text-sm text-slate-500">Total Invested</p>
+                  <p className="text-xl font-bold text-slate-700">{formatCurrency(totalInvested)}</p>
+                </div>
+                <div className="bg-white p-4 rounded-lg border border-slate-200">
+                  <p className="text-sm text-slate-500">Estimated Returns</p>
+                  <p className="text-xl font-bold text-emerald-600">{formatCurrency(estimatedReturns)}</p>
+                </div>
+              </div>
+
+              <div className="flex-grow flex flex-col justify-end">
+                <ResultChart investedAmount={totalInvested} estimatedReturns={estimatedReturns} />
               </div>
             </div>
 
-            <div className="flex-grow flex flex-col justify-end animate-fade-in-up" style={{animationDelay: '400ms'}}>
-              <ResultChart investedAmount={totalInvested} estimatedReturns={estimatedReturns} />
+            <div className="mt-8 text-center">
+              <button
+                onClick={handleDownloadPdf}
+                disabled={isGeneratingPdf}
+                className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-brand-600 text-white font-semibold rounded-lg shadow-md hover:bg-brand-700 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-500 disabled:bg-brand-400 disabled:cursor-not-allowed"
+              >
+                {isGeneratingPdf ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-5 h-5" />
+                    <span>Download Report</span>
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
